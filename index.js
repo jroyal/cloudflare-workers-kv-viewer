@@ -17,6 +17,9 @@ function getHeaders(email, authKey) {
 async function getNamespaces({ accountId, authEmail, authKey }) {
   const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}`;
   const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
+  if (resp.status != 200) {
+    throw `Failed to get namespaces\n${await resp.text()}`;
+  }
   const namespaces = await resp.json();
   return namespaces.result;
 }
@@ -24,6 +27,9 @@ async function getNamespaces({ accountId, authEmail, authKey }) {
 async function getKeys({ accountId, authEmail, authKey }, namespace) {
   const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/keys`;
   const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
+  if (resp.status != 200) {
+    throw `Failed to get keys\n${await resp.text()}`;
+  }
   const keys = await resp.json();
   return keys.result;
 }
@@ -31,6 +37,9 @@ async function getKeys({ accountId, authEmail, authKey }, namespace) {
 async function getKey({ accountId, authEmail, authKey }, namespace, key) {
   const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/values/${key}`;
   const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
+  if (resp.status != 200) {
+    throw `Failed to get key\n${await resp.text()}`;
+  }
   const body = await resp.json();
   return body;
 }
@@ -71,8 +80,8 @@ async function main() {
     .option("--account-id <id>", "Cloudflare Account ID")
     .option("--account-email <email>", "Cloudflare Auth Email")
     .option("--account-key <key>", "Cloudflare Auth Key")
-    .option("-n, --namespace", "Namespace")
-    .option("-k, --key", "Key to get")
+    .option("-n, --namespace <ns>", "Namespace")
+    .option("-k, --key <key>", "Key to get")
     .parse(process.argv);
 
   const accountId = program.account_id || process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -80,12 +89,12 @@ async function main() {
     console.log("CLOUDFLARE_ACCOUNT_ID is required!");
     process.exit(1);
   }
-  const authEmail = program.email || process.env.CLOUDFLARE_AUTH_EMAIL;
+  const authEmail = program.accountEmail || process.env.CLOUDFLARE_AUTH_EMAIL;
   if (!authEmail) {
     console.log("CLOUDFLARE_AUTH_EMAIL is required!");
     process.exit(1);
   }
-  const authKey = program.key || process.env.CLOUDFLARE_AUTH_KEY;
+  const authKey = program.accountKey || process.env.CLOUDFLARE_AUTH_KEY;
   if (!authKey) {
     console.log("CLOUDFLARE_AUTH_KEY is required!");
     process.exit(1);
@@ -94,9 +103,23 @@ async function main() {
   const accountVars = { accountId, authEmail, authKey };
 
   const namespaces = await getNamespaces(accountVars);
-  const ns = await pickNamespace(namespaces);
-  const keys = await getKeys(accountVars, ns.id);
-  const key = await pickKey(keys);
+
+  let ns;
+  if (program.namespace) {
+    ns = namespaces.filter(ns => ns.title === program.namespace);
+    ns = ns ? ns[0] : null;
+  }
+  if (!ns) {
+    ns = await pickNamespace(namespaces);
+  }
+
+  let key;
+  if (program.key) {
+    key = program.key;
+  } else {
+    const keys = await getKeys(accountVars, ns.id);
+    key = await pickKey(keys);
+  }
   const val = await getKey(accountVars, ns.id, key);
   console.log(JSON.stringify(val, undefined, 2));
 }
