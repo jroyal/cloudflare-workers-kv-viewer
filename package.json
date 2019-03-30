@@ -1,6 +1,6 @@
 {
   "name": "cloudflare-workers-kv-viewer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Interactive prompt for finding and viewing a key in Cloudflare Workers KV",
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,11 @@
   "bin": {
     "cfkvi": "./index.js"
   },
+  "homepage": "https://github.com/jroyal/cloudflare-workers-kv-viewer",
+  "bugs": {
+    "url": "https://github.com/jroyal/cloudflare-workers-kv-viewer/issues"
+  },
+  "repository": "jroyal/cloudflare-workers-kv-viewer",
   "author": "James Royal",
   "license": "MIT",
   "dependencies": {
