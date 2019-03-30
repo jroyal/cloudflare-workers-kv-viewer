@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 const { prompt } = require("enquirer");
+const program = require("commander");
 const fetch = require("node-fetch");
 
 const BASE_URL = "https://api.cloudflare.com/client/v4/accounts";
 const NAMESPACES_API = "storage/kv/namespaces";
-const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
-const CLOUDFLARE_AUTH_EMAIL = process.env.CLOUDFLARE_AUTH_EMAIL;
-const CLOUDFLARE_AUTH_KEY = process.env.CLOUDFLARE_AUTH_KEY;
 
-const headers = {
-  "X-Auth-Email": CLOUDFLARE_AUTH_EMAIL,
-  "X-Auth-Key": CLOUDFLARE_AUTH_KEY,
-  "Content-Type": "application/json"
-};
+function getHeaders(email, authKey) {
+  return {
+    "X-Auth-Email": email,
+    "X-Auth-Key": authKey,
+    "Content-Type": "application/json"
+  };
+}
 
-async function getNamespaces() {
-  const url = `${BASE_URL}/${CLOUDFLARE_ACCOUNT_ID}/${NAMESPACES_API}`;
-  const resp = await fetch(url, { headers: headers });
+async function getNamespaces({ accountId, authEmail, authKey }) {
+  const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}`;
+  const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
   const namespaces = await resp.json();
   return namespaces.result;
 }
 
-async function getKeys(namespace) {
-  const url = `${BASE_URL}/${CLOUDFLARE_ACCOUNT_ID}/${NAMESPACES_API}/${namespace}/keys`;
-  const resp = await fetch(url, { headers: headers });
+async function getKeys({ accountId, authEmail, authKey }, namespace) {
+  const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/keys`;
+  const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
   const keys = await resp.json();
   return keys.result;
 }
 
-async function getKey(namespace, key) {
-  const url = `${BASE_URL}/${CLOUDFLARE_ACCOUNT_ID}/${NAMESPACES_API}/${namespace}/values/${key}`;
-  const resp = await fetch(url, { headers: headers });
+async function getKey({ accountId, authEmail, authKey }, namespace, key) {
+  const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/values/${key}`;
+  const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
   const body = await resp.json();
   return body;
 }
@@ -67,11 +67,37 @@ async function pickKey(keys) {
 }
 
 async function main() {
-  const namespaces = await getNamespaces();
+  program
+    .option("--account-id <id>", "Cloudflare Account ID")
+    .option("--account-email <email>", "Cloudflare Auth Email")
+    .option("--account-key <key>", "Cloudflare Auth Key")
+    .option("-n, --namespace", "Namespace")
+    .option("-k, --key", "Key to get")
+    .parse(process.argv);
+
+  const accountId = program.account_id || process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (!accountId) {
+    console.log("CLOUDFLARE_ACCOUNT_ID is required!");
+    process.exit(1);
+  }
+  const authEmail = program.email || process.env.CLOUDFLARE_AUTH_EMAIL;
+  if (!authEmail) {
+    console.log("CLOUDFLARE_AUTH_EMAIL is required!");
+    process.exit(1);
+  }
+  const authKey = program.key || process.env.CLOUDFLARE_AUTH_KEY;
+  if (!authKey) {
+    console.log("CLOUDFLARE_AUTH_KEY is required!");
+    process.exit(1);
+  }
+
+  const accountVars = { accountId, authEmail, authKey };
+
+  const namespaces = await getNamespaces(accountVars);
   const ns = await pickNamespace(namespaces);
-  const keys = await getKeys(ns.id);
+  const keys = await getKeys(accountVars, ns.id);
   const key = await pickKey(keys);
-  const val = await getKey(ns.id, key);
+  const val = await getKey(accountVars, ns.id, key);
   console.log(JSON.stringify(val, undefined, 2));
 }
-main();
+main().catch(e => console.log(e));

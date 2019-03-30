@@ -17,6 +17,7 @@
   "author": "James Royal",
   "license": "MIT",
   "dependencies": {
+    "commander": "^2.19.0",
     "enquirer": "^2.3.0",
     "node-fetch": "^2.3.0"
   }
