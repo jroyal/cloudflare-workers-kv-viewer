@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const { prompt } = require("enquirer");
 const fetch = require("node-fetch");
 
