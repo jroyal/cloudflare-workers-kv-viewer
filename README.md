@@ -7,7 +7,7 @@ Cloudflare Workers KV interactive viewer
 
 `npm install cloudflare-workers-kv-viewer -g`
 
-## Required variables
+## Environment variables
 
 ```
 CLOUDFLARE_AUTH_EMAIL # your cloudflare account email
