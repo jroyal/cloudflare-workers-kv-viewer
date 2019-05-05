@@ -5,6 +5,7 @@ const fetch = require("node-fetch");
 
 const BASE_URL = "https://api.cloudflare.com/client/v4/accounts";
 const NAMESPACES_API = "storage/kv/namespaces";
+const cache = {};
 
 function getHeaders(email, authKey) {
   return {
@@ -15,22 +16,51 @@ function getHeaders(email, authKey) {
 }
 
 async function getNamespaces({ accountId, authEmail, authKey }) {
+  if (cache.namespaces) {
+    return cache.namespaces;
+  }
   const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}`;
   const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
   if (resp.status != 200) {
     throw `Failed to get namespaces\n${await resp.text()}`;
   }
   const namespaces = await resp.json();
+  cache["namespaces"] = namespaces.result;
   return namespaces.result;
 }
 
-async function getKeys({ accountId, authEmail, authKey }, namespace) {
-  const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/keys`;
+async function getKeys(
+  { accountId, authEmail, authKey },
+  namespace,
+  cursor = ""
+) {
+  if (cache[namespace] && !cursor) {
+    return cache[namespace];
+  }
+  let url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/keys`;
+  if (cursor) {
+    url += `?cursor=${cursor}`;
+  }
   const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
   if (resp.status != 200) {
     throw `Failed to get keys\n${await resp.text()}`;
   }
-  const keys = await resp.json();
+  let keys = await resp.json();
+
+  // check to see if there are more than 1000 keys
+  if (keys.result_info && keys.result_info.cursor) {
+    keys.result.concat(
+      await getKeys(
+        { accountId, authEmail, authKey },
+        namespace,
+        keys.result_info.cursor
+      )
+    );
+    if (!cursor) {
+      cache[namespace] = keys.result;
+    }
+  }
+
   return keys.result;
 }
 
@@ -75,33 +105,7 @@ async function pickKey(keys) {
   return resp.key;
 }
 
-async function main() {
-  program
-    .option("--account-id <id>", "Cloudflare Account ID")
-    .option("--account-email <email>", "Cloudflare Auth Email")
-    .option("--account-key <key>", "Cloudflare Auth Key")
-    .option("-n, --namespace <ns>", "Namespace")
-    .option("-k, --key <key>", "Key to get")
-    .parse(process.argv);
-
-  const accountId = program.account_id || process.env.CLOUDFLARE_ACCOUNT_ID;
-  if (!accountId) {
-    console.log("CLOUDFLARE_ACCOUNT_ID is required!");
-    process.exit(1);
-  }
-  const authEmail = program.accountEmail || process.env.CLOUDFLARE_AUTH_EMAIL;
-  if (!authEmail) {
-    console.log("CLOUDFLARE_AUTH_EMAIL is required!");
-    process.exit(1);
-  }
-  const authKey = program.accountKey || process.env.CLOUDFLARE_AUTH_KEY;
-  if (!authKey) {
-    console.log("CLOUDFLARE_AUTH_KEY is required!");
-    process.exit(1);
-  }
-
-  const accountVars = { accountId, authEmail, authKey };
-
+async function run(accountVars, program) {
   const namespaces = await getNamespaces(accountVars);
 
   let ns;
@@ -122,5 +126,42 @@ async function main() {
   }
   const val = await getKey(accountVars, ns.id, key);
   console.log(JSON.stringify(val, undefined, 2));
+}
+
+async function main() {
+  program
+    .option("--account-id <id>", "Cloudflare Account ID")
+    .option("--account-email <email>", "Cloudflare Auth Email")
+    .option("--account-key <key>", "Cloudflare Auth Key")
+    .option("-n, --namespace <ns>", "Namespace")
+    .option("-k, --key <key>", "Key to get")
+    .option("-l, --loop", "Keep prompting for new values")
+    .parse(process.argv);
+
+  const accountId = program.account_id || process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (!accountId) {
+    console.log("CLOUDFLARE_ACCOUNT_ID is required!");
+    process.exit(1);
+  }
+  const authEmail = program.accountEmail || process.env.CLOUDFLARE_AUTH_EMAIL;
+  if (!authEmail) {
+    console.log("CLOUDFLARE_AUTH_EMAIL is required!");
+    process.exit(1);
+  }
+  const authKey = program.accountKey || process.env.CLOUDFLARE_AUTH_KEY;
+  if (!authKey) {
+    console.log("CLOUDFLARE_AUTH_KEY is required!");
+    process.exit(1);
+  }
+
+  const accountVars = { accountId, authEmail, authKey };
+
+  if (program.loop && !(program.key && program.namespace)) {
+    while (true) {
+      await run(accountVars, program);
+    }
+  } else {
+    await run(accountVars, program);
+  }
 }
 main().catch(e => console.log(e));
