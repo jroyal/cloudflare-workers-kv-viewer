@@ -24,13 +24,31 @@ async function getNamespaces({ accountId, authEmail, authKey }) {
   return namespaces.result;
 }
 
-async function getKeys({ accountId, authEmail, authKey }, namespace) {
-  const url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/keys`;
+async function getKeys(
+  { accountId, authEmail, authKey },
+  namespace,
+  cursor = ""
+) {
+  let url = `${BASE_URL}/${accountId}/${NAMESPACES_API}/${namespace}/keys`;
+  if (cursor) {
+    url += `?cursor=${cursor}`;
+  }
   const resp = await fetch(url, { headers: getHeaders(authEmail, authKey) });
   if (resp.status != 200) {
     throw `Failed to get keys\n${await resp.text()}`;
   }
-  const keys = await resp.json();
+  let keys = await resp.json();
+
+  // check to see if there are more than 1000 keys
+  if (keys.result_info && keys.result_info.cursor) {
+    return keys.result.concat(
+      await getKeys(
+        { accountId, authEmail, authKey },
+        namespace,
+        keys.result_info.cursor
+      )
+    );
+  }
   return keys.result;
 }
 
