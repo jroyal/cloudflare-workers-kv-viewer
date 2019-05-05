@@ -31,5 +31,6 @@ Options:
   --account-key <key>      Cloudflare Auth Key
   -n, --namespace <ns>     Namespace
   -k, --key <key>          Key to get
+  -l, --loop               Keep prompting for new values
   -h, --help               output usage information
 ```
