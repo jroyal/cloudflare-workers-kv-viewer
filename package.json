@@ -1,6 +1,6 @@
 {
   "name": "cloudflare-workers-kv-viewer",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Interactive prompt for finding and viewing a key in Cloudflare Workers KV",
   "main": "index.js",
   "scripts": {
