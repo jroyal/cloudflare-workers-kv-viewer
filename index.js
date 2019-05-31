@@ -49,7 +49,7 @@ async function getKeys(
 
   // check to see if there are more than 1000 keys
   if (keys.result_info && keys.result_info.cursor) {
-    keys.result.concat(
+    keys.result = keys.result.concat(
       await getKeys(
         { accountId, authEmail, authKey },
         namespace,
